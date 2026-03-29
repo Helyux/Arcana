@@ -1,0 +1,197 @@
+// This script runs in the MAIN world to access Steam's internal variables
+(function() {
+  let lastListingKeys = "";
+  let hasForced100 = false;
+  let isDeepScanning = false;
+  let stopDeepScanRequested = false;
+
+  window.addEventListener('ArcanaStartDeepScan', () => {
+    if (isDeepScanning) return;
+    stopDeepScanRequested = false;
+    startDeepScan();
+  });
+
+  window.addEventListener('ArcanaStopDeepScan', () => {
+    stopDeepScanRequested = true;
+  });
+
+  async function startDeepScan() {
+    isDeepScanning = true;
+    console.log("[Arcana] Starting Deep Scan...");
+    
+    // @ts-ignore
+    let start = window.g_oSearchResults?.m_iStart || 0;
+    // @ts-ignore
+    const totalCount = window.g_oSearchResults?.m_cTotalCount || 0;
+    start += 100;
+
+    // @ts-ignore
+    const query = window.g_oSearchResults?.m_strQuery || '';
+    // @ts-ignore
+    const currency = typeof window.g_rgWalletInfo !== 'undefined' ? window.g_rgWalletInfo.wallet_currency : 1;
+    // @ts-ignore
+    const country = typeof window.g_strCountryCode !== 'undefined' ? window.g_strCountryCode : 'US';
+    // @ts-ignore
+    const language = typeof window.g_strLanguage !== 'undefined' ? window.g_strLanguage : 'english';
+    
+    while (start < totalCount) {
+      if (stopDeepScanRequested) break;
+
+      window.dispatchEvent(new CustomEvent('ArcanaScanProgress', {
+        detail: { active: true, current: start, total: totalCount }
+      }));
+
+      try {
+        const url = `${window.location.pathname}/render/?query=${encodeURIComponent(query)}&start=${start}&count=100&country=${country}&language=${language}&currency=${currency}`;
+        
+        const res = await fetch(url);
+        if (!res.ok) {
+          if (res.status === 429) console.warn("[Arcana] Hit rate limit! Pausing scan.");
+          break;
+        }
+        const json = await res.json();
+        
+        if (json && json.success) {
+          // @ts-ignore
+          if (json.assets && window.g_rgAssets) {
+            for (const appid in json.assets) {
+              // @ts-ignore
+              if (!window.g_rgAssets[appid]) window.g_rgAssets[appid] = {};
+              for (const contextid in json.assets[appid]) {
+                // @ts-ignore
+                if (!window.g_rgAssets[appid][contextid]) window.g_rgAssets[appid][contextid] = {};
+                // @ts-ignore
+                Object.assign(window.g_rgAssets[appid][contextid], json.assets[appid][contextid]);
+              }
+            }
+          }
+          
+          // @ts-ignore
+          if (json.listinginfo && window.g_rgListingInfo) {
+            // @ts-ignore
+            Object.assign(window.g_rgListingInfo, json.listinginfo);
+          }
+
+          const chunkData = parseMarketData(json.listinginfo, json.assets);
+          window.dispatchEvent(new CustomEvent('SteamMarketDeepScanChunk', {
+            detail: {
+              results_html: json.results_html,
+              chunkData: chunkData
+            }
+          }));
+          
+          extractData();
+        }
+      } catch (e) {
+        console.error("[Arcana] Deep scan fetch error:", e);
+      }
+
+      start += 100;
+      await new Promise(r => setTimeout(r, 1000));
+    }
+
+    isDeepScanning = false;
+    window.dispatchEvent(new CustomEvent('ArcanaScanProgress', {
+      detail: { active: false, current: 0, total: totalCount }
+    }));
+    console.log("[Arcana] Deep Scan Finished.");
+  }
+
+  function force100Listings() {
+    if (hasForced100) return;
+    
+    // @ts-ignore
+    const searchResults = window.g_oSearchResults;
+    if (searchResults && searchResults.m_cPageSize < 100) {
+      console.log("[Arcana] Forcing 100 listings...");
+      searchResults.m_cPageSize = 100;
+      searchResults.GoToPage(0, true);
+      hasForced100 = true;
+    } else if (searchResults && searchResults.m_cPageSize >= 100) {
+      hasForced100 = true; // Already 100 or more
+    }
+  }
+
+  function parseMarketData(listingInfo: any, assets: any) {
+    const marketData: Record<string, { wear: string; pattern: string }> = {};
+
+    for (const listingId in listingInfo) {
+      const info = listingInfo[listingId];
+      if (!info || !info.asset) continue;
+
+      const assetId = info.asset.id;
+      const appid = info.asset.appid;
+      const contextid = info.asset.contextid;
+
+      const asset = assets?.[appid]?.[contextid]?.[assetId];
+      if (!asset) continue;
+
+      let wear = "";
+      let pattern = "";
+
+      // 1. Try asset_properties (More reliable/Universal)
+      if (asset.asset_properties) {
+        for (const prop of asset.asset_properties) {
+            if (prop.propertyid === 1 || prop.id === 1) { // Pattern
+              pattern = prop.int_value?.toString() || "";
+            } else if (prop.propertyid === 2 || prop.id === 2) { // Wear
+              wear = prop.float_value?.toString() || "";
+            }
+        }
+      }
+
+      // 2. Fallback to descriptions (Language dependent)
+      if (!wear || !pattern) {
+        const descriptions = asset.descriptions || [];
+        for (const desc of descriptions) {
+          const val = desc.value || "";
+          if (val.includes("Wear Rating:") || val.includes("Abnutzungsgrad:")) {
+            wear = val.split(":")[1]?.trim() || "";
+          } else if (val.includes("Pattern Template:") || val.includes("Mustervorlage:")) {
+            pattern = val.split(":")[1]?.trim() || "";
+          }
+        }
+      }
+
+      if (wear || pattern) {
+        marketData[listingId] = { wear, pattern };
+      }
+    }
+    return marketData;
+  }
+
+  function extractData() {
+    try {
+      // Also check for 100 listings here
+      force100Listings();
+
+      // @ts-ignore
+      const assets = window.g_rgAssets;
+      // @ts-ignore
+      const listingInfo = window.g_rgListingInfo;
+
+      if (!assets || !listingInfo) return;
+
+      const keys = Object.keys(listingInfo);
+      if (keys.length === 0) return;
+      
+      const currentKeys = keys.join(',');
+      // Only dispatch if something changed
+      if (currentKeys === lastListingKeys) return;
+      lastListingKeys = currentKeys;
+
+      const marketData = parseMarketData(listingInfo, assets);
+
+      // Dispatch to the isolated world
+      window.dispatchEvent(new CustomEvent('SteamMarketDataLoaded', {
+        detail: marketData
+      }));
+    } catch (e) {
+      // Silent fail to avoid breaking Steam
+    }
+  }
+
+  // Poll instead of patching XHR to avoid Prototype.js conflicts
+  setInterval(extractData, 1000);
+  extractData();
+})();

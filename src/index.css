@@ -1,0 +1,102 @@
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* 
+   CRITICAL: Do NOT add global styles for body, html, or common tags 
+   as they will be injected into the Steam Community Market page 
+   and will break its native layout.
+*/
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+/* Custom styles for our injected badges only */
+.steam-extra-info-root {
+  all: initial;
+  /* Reset */
+  font-family: var(--font-sans);
+  display: flex !important; /* Flex container to hold the badges */
+  flex-direction: column !important;
+  float: none !important; /* Crucial: Prevent floating next to siblings */
+  clear: none !important;
+  width: 100% !important;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+/* Arcana Match Highlight - Intense Version */
+.arcana-match-highlight {
+  position: relative;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.25) 0%, rgba(239, 68, 68, 0.1) 100%) !important;
+  box-shadow: inset 4px 0 0 0 #ef4444, inset 10px 0 30px -10px rgba(239, 68, 68, 0.4) !important;
+  outline: 1.5px solid #ef4444 !important;
+  outline-offset: -1.5px;
+}
+
+.arcana-match-highlight::after {
+  content: 'MATCH';
+  position: absolute;
+  top: 4px;
+  right: 64px;
+  /* Move away from the edge to avoid clipping */
+  font-size: 9px;
+  font-weight: 900;
+  color: #f87171;
+  letter-spacing: 0.1em;
+  opacity: 1;
+  animation: pulse-light 2s infinite;
+}
+
+@keyframes pulse-light {
+  0% {
+    opacity: 0.6;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.6;
+  }
+}
+
+/* Force stickers and charms to be horizontal and below info */
+.sticker_info,
+.keychain_info {
+  display: flex !important;
+  float: none !important; /* Crucial: Steam natively floats these! */
+  clear: none !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: fit-content !important;
+  margin-top: 4px !important;
+  margin-bottom: 4px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  padding: 4px 8px !important;
+  border-radius: 6px !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-sizing: border-box !important;
+}
+
+.sticker_info br,
+.keychain_info br {
+  display: none !important;
+}
+
+.sticker_info img,
+.keychain_info img {
+  width: 24px !important;
+  height: 24px !important;
+  display: block !important;
+  object-fit: contain !important;
+}
+
+/* Arcana Global Filtering */
+body.arcana-filtering-active .market_listing_row[data-extra-info-processed="true"]:not(.arcana-match-highlight) {
+  display: none !important;
+}
