@@ -1,6 +1,6 @@
 # <img src="public/icon.png" width="32" height="32"> Arcana
 
-A browser extension for CS2 that displays **Float Values** and **Pattern Templates** directly on Steam Community Market listings. Includes powerful filtering and an autonomous deep-scan engine to find specific patterns across thousands of listings.
+A browser extension that displays **Float Values** and **Pattern Templates** for **CS2 items** directly on the Steam Community Market. Includes powerful filtering and an autonomous deep-scan engine to find specific patterns across thousands of listings.
 
 ## Features
 
@@ -75,11 +75,6 @@ Detailed build instructions for Mozilla reviewers can be found in [FIREFOX.md](d
 └── vite.config.ts      # Vite bundler configuration
 ```
 
-## Tech Stack
-
-- **TypeScript** + **React** for UI components
-- **Vite** + **CRXJS** for extension bundling
-- **Tailwind CSS** for component styling
 
 ## Contributing
 Contributions are welcome! Open an issue or submit a pull request.
