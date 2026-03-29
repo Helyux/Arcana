@@ -100,3 +100,13 @@
 body.arcana-filtering-active .market_listing_row[data-extra-info-processed="true"]:not(.arcana-match-highlight) {
   display: none !important;
 }
+
+/* Arcana Group Pills */
+.arcana-group-pill {
+  background: rgba(168, 85, 247, 0.1);
+  color: rgba(192, 132, 252, 0.8);
+  border-color: rgba(168, 85, 247, 0.2) !important;
+  font-family: var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

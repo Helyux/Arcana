@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arcana</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <header class="popup-header">
+      <img src="/icon.png" alt="Arcana" class="popup-logo" width="28" height="28">
+      <div class="popup-title">
+        <h1>Arcana</h1>
+        <span class="popup-version" id="version"></span>
+      </div>
+    </header>
+
+    <section class="popup-section">
+      <div class="section-header">
+        <span class="section-icon">🔮</span>
+        <span class="section-title">Pattern Database</span>
+      </div>
+      <div class="section-body">
+        <div class="status-row">
+          <span class="status-label">Last updated</span>
+          <span class="status-value" id="lastUpdated">Never</span>
+        </div>
+        <button id="refreshBtn" class="refresh-btn">
+          <span class="refresh-icon" id="refreshIcon">↻</span>
+          <span id="refreshText">Update Now</span>
+        </button>
+      </div>
+    </section>
+
+    <footer class="popup-footer">
+      <a href="https://github.com/Helyux/cs2pattern" target="_blank" rel="noopener">cs2pattern</a>
+      <span class="separator">·</span>
+      <a href="https://github.com/Helyux/Arcana" target="_blank" rel="noopener">GitHub</a>
+    </footer>
+  </div>
+
+  <script src="popup.ts" type="module"></script>
+</body>
+</html>

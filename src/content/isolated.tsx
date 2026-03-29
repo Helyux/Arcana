@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { ListingBadge } from '../components/ListingBadge';
 import { PatternFilter } from '../components/PatternFilter';
+import { parseMarketUrl, lookupPatterns, type PatternGroup } from '../services/patternDb';
 import '../index.css';
 
 const marketData = new Map<string, { wear: string; pattern: string }>();
@@ -9,6 +10,11 @@ let highlightPatterns: string[] = [];
 let patternFilterActive = false;
 const itemId = window.location.pathname.split('/').pop() || 'global';
 const badgeRoots = new Map<string, Root>();
+
+// Remote pattern data
+let remoteGroups: PatternGroup[] | null = null;
+let remoteDefaultString = '';
+let userHasEdited = false;
 
 function toggleBodyFilterClass() {
   if (patternFilterActive) {
@@ -18,29 +24,95 @@ function toggleBodyFilterClass() {
   }
 }
 
-// Load patterns specific to this page
-chrome.storage.local.get(['arcana_filters', 'arcana_filter_active'], (result: { arcana_filters?: Record<string, string>, arcana_filter_active?: Record<string, boolean> }) => {
-  const filters = result.arcana_filters || {};
-  const itemFilters = filters[itemId];
-  
-  const activeStates = result.arcana_filter_active || {};
-  patternFilterActive = !!activeStates[itemId];
-  toggleBodyFilterClass();
+// Build a lookup: pattern ID (string) → { name, icon } for matched badges
+function buildPatternGroupMap(): Map<string, { name: string; icon: string }> {
+  const map = new Map<string, { name: string; icon: string }>();
+  if (!remoteGroups) return map;
+  for (const group of remoteGroups) {
+    for (const pid of group.pattern) {
+      map.set(String(pid), { name: group.name, icon: group.icon });
+    }
+  }
+  return map;
+}
 
-  if (itemFilters) {
-    highlightPatterns = itemFilters.split(',').map((p: string) => p.trim()).filter(Boolean);
+let patternGroupMap = new Map<string, { name: string; icon: string }>();
+
+// Initialize: load remote patterns + user state
+async function initRemotePatterns() {
+  const parsed = parseMarketUrl(window.location.href);
+  if (!parsed) return;
+
+  const groups = await lookupPatterns(parsed.skin, parsed.weapon);
+  if (groups && groups.length > 0) {
+    remoteGroups = groups;
+    remoteDefaultString = groups.flatMap(g => g.pattern).join(', ');
+    patternGroupMap = buildPatternGroupMap();
+  }
+}
+
+// Load user state from storage, then apply patterns
+function initUserState() {
+  chrome.storage.local.get(['arcana_filters', 'arcana_filter_active', 'arcana_user_edited'], (result: {
+    arcana_filters?: Record<string, string>;
+    arcana_filter_active?: Record<string, boolean>;
+    arcana_user_edited?: Record<string, boolean>;
+  }) => {
+    const filters = result.arcana_filters || {};
+    const activeStates = result.arcana_filter_active || {};
+    const editedStates = result.arcana_user_edited || {};
+
+    patternFilterActive = !!activeStates[itemId];
+    toggleBodyFilterClass();
+
+    userHasEdited = !!editedStates[itemId];
+
+    if (userHasEdited && filters[itemId]) {
+      // User has custom patterns — use those
+      highlightPatterns = filters[itemId].split(',').map((p: string) => p.trim()).filter(Boolean);
+    } else if (!userHasEdited && remoteDefaultString) {
+      // No user edits — use remote defaults
+      highlightPatterns = remoteDefaultString.split(',').map((p: string) => p.trim()).filter(Boolean);
+    } else if (filters[itemId]) {
+      highlightPatterns = filters[itemId].split(',').map((p: string) => p.trim()).filter(Boolean);
+    }
+
+    processListings(true);
+    injectFilter();
+  });
+}
+
+// Listen for real-time pattern updates from the filter component
+window.addEventListener('ArcanaPatternUpdate', (e: Event) => {
+  const customEvent = e as CustomEvent;
+  const { patterns, userEdited } = customEvent.detail;
+  userHasEdited = userEdited;
+
+  if (userEdited) {
+    highlightPatterns = (patterns as string).split(',').map((p: string) => p.trim()).filter(Boolean);
+  } else if (remoteDefaultString) {
+    highlightPatterns = remoteDefaultString.split(',').map((p: string) => p.trim()).filter(Boolean);
+  } else {
+    highlightPatterns = (patterns as string).split(',').map((p: string) => p.trim()).filter(Boolean);
   }
   processListings(true);
 });
 
-// Listen for storage changes
+// Listen for storage changes from other tabs/extension
 chrome.storage.onChanged.addListener((changes: { [key: string]: chrome.storage.StorageChange }) => {
   let needsUpdate = false;
 
   if (changes.arcana_filters) {
     const filters = (changes.arcana_filters.newValue as Record<string, string>) || {};
-    const itemFilters = filters[itemId];
-    highlightPatterns = (itemFilters || '').split(',').map((p: string) => p.trim()).filter(Boolean);
+    const editedStates: Record<string, boolean> = {};
+    chrome.storage.local.get(['arcana_user_edited'], (result) => {
+      Object.assign(editedStates, result.arcana_user_edited || {});
+    });
+    
+    if (editedStates[itemId] || userHasEdited) {
+      const itemFilters = filters[itemId];
+      highlightPatterns = (itemFilters || '').split(',').map((p: string) => p.trim()).filter(Boolean);
+    }
     needsUpdate = true;
   }
 
@@ -48,6 +120,16 @@ chrome.storage.onChanged.addListener((changes: { [key: string]: chrome.storage.S
     const activeStates = (changes.arcana_filter_active.newValue as Record<string, boolean>) || {};
     patternFilterActive = !!activeStates[itemId];
     toggleBodyFilterClass();
+    needsUpdate = true;
+  }
+
+  if (changes.arcana_user_edited) {
+    const editedStates = (changes.arcana_user_edited.newValue as Record<string, boolean>) || {};
+    userHasEdited = !!editedStates[itemId];
+
+    if (!userHasEdited && remoteDefaultString) {
+      highlightPatterns = remoteDefaultString.split(',').map((p: string) => p.trim()).filter(Boolean);
+    }
     needsUpdate = true;
   }
 
@@ -73,8 +155,6 @@ function processListings(forceRender = false) {
     const isProcessed = row.getAttribute('data-extra-info-processed') === 'true';
     const hasContainer = row.querySelector('.steam-extra-info-root');
 
-    // Re-render only if forced (e.g. pattern filters updated), 
-    // or if not previously processed, or if Steam's internal DOM updates destroyed the container.
     if (forceRender || !isProcessed || !hasContainer) {
       applyHighlight(row, data);
       renderBadge(row, data, listingId);
@@ -91,6 +171,8 @@ function applyHighlight(row: Element, data: { pattern: string }) {
   }
 }
 
+let filterRoot: Root | null = null;
+
 function injectFilter() {
   const target = document.querySelector('#market_buyorder_info') || document.querySelector('.market_listing_filter');
   if (!target || document.querySelector('.arcana-filter-root')) return;
@@ -99,9 +181,21 @@ function injectFilter() {
   rootContainer.className = 'arcana-filter-root';
   target.parentElement?.insertBefore(rootContainer, target);
 
-  createRoot(rootContainer).render(
+  const groupsForFilter = remoteGroups?.map(g => ({
+    name: g.name,
+    icon: g.icon,
+    patterns: g.pattern,
+  })) || [];
+
+  filterRoot = createRoot(rootContainer);
+  filterRoot.render(
     <React.StrictMode>
-      <PatternFilter itemId={itemId} />
+      <PatternFilter
+        itemId={itemId}
+        defaultPatterns={remoteDefaultString}
+        defaultGroups={groupsForFilter}
+        hasRemoteDefaults={!!(remoteGroups && remoteGroups.length > 0)}
+      />
     </React.StrictMode>
   );
 }
@@ -117,9 +211,6 @@ function renderBadge(row: Element, data: { wear: string, pattern: string }, list
     rootContainer = document.createElement('div');
     rootContainer.className = 'steam-extra-info-root';
 
-    // Position: Below Name, Above Stickers/Charms
-    // Steam sometimes nests stickers inside .market_listing_row_details. 
-    // We must inject as a sibling to that block to ensure strict vertical CSS stacking.
     const detailsBlock = row.querySelector('.market_listing_row_details');
     
     if (detailsBlock && detailsBlock.parentElement === nameBlock) {
@@ -135,6 +226,7 @@ function renderBadge(row: Element, data: { wear: string, pattern: string }, list
   }
 
   const isMatched = highlightPatterns.includes(data.pattern);
+  const matchInfo = isMatched ? (patternGroupMap.get(data.pattern) || null) : null;
 
   let root = badgeRoots.get(listingId);
   if (!root || !document.body.contains(rootContainer)) {
@@ -144,12 +236,10 @@ function renderBadge(row: Element, data: { wear: string, pattern: string }, list
 
   root.render(
     <React.StrictMode>
-      <ListingBadge wear={data.wear} pattern={data.pattern} isMatched={isMatched} />
+      <ListingBadge wear={data.wear} pattern={data.pattern} isMatched={isMatched} matchInfo={matchInfo} />
     </React.StrictMode>
   );
 }
-
-
 
 // Reset when a major DOM change occurs
 const observer = new MutationObserver(() => {
@@ -184,8 +274,6 @@ window.addEventListener('SteamMarketDeepScanChunk', (event: Event) => {
   const customEvent = event as CustomEvent;
   const { results_html, chunkData } = customEvent.detail;
   
-  // If no patterns are active, we do not want to violently dump thousands of items
-  // into the DOM. We only pluck explicitly requested patterns.
   if (!highlightPatterns || highlightPatterns.length === 0) return;
 
   const doc = new DOMParser().parseFromString(results_html, 'text/html');
@@ -201,7 +289,6 @@ window.addEventListener('SteamMarketDeepScanChunk', (event: Event) => {
     if (highlightPatterns.includes(data.pattern)) {
       const row = tempDiv.querySelector(`#listing_${listingId}`);
       if (row) {
-        // Prevent duplicate appending if the user runs the scan multiple times
         if (!document.querySelector(`#listing_${listingId}`)) {
            searchResultsRows.appendChild(row);
            marketData.set(listingId, data);
@@ -216,11 +303,15 @@ window.addEventListener('SteamMarketDeepScanChunk', (event: Event) => {
   }
 });
 
+// Bootstrap: load remote patterns first, then user state
+initRemotePatterns().then(() => {
+  initUserState();
+});
+
 // Periodic check
 setInterval(() => {
   processListings(false);
-  injectFilter();
+  if (!document.querySelector('.arcana-filter-root')) {
+    injectFilter();
+  }
 }, 1000);
-
-processListings(false);
-injectFilter();
