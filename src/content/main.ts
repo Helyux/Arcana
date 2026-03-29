@@ -1,5 +1,23 @@
 // This script runs in the MAIN world to access Steam's internal variables
 (function() {
+  interface SteamAsset {
+    descriptions?: Array<{ value: string; color?: string }>;
+    asset_properties?: Array<{
+      propertyid?: number;
+      id?: number;
+      int_value?: number;
+      float_value?: number;
+    }>;
+  }
+
+  interface SteamListing {
+    asset?: {
+      id: string;
+      appid: number;
+      contextid: string;
+    };
+  }
+
   let lastListingKeys = "";
   let hasForced100 = false;
   let isDeepScanning = false;
@@ -19,19 +37,19 @@
     isDeepScanning = true;
     console.log("[Arcana] Starting Deep Scan...");
     
-    // @ts-ignore
+    // @ts-expect-error: Steam internal variable
     let start = window.g_oSearchResults?.m_iStart || 0;
-    // @ts-ignore
+    // @ts-expect-error: Steam internal variable
     const totalCount = window.g_oSearchResults?.m_cTotalCount || 0;
     start += 100;
 
-    // @ts-ignore
+    // @ts-expect-error: Steam internal variable
     const query = window.g_oSearchResults?.m_strQuery || '';
-    // @ts-ignore
+    // @ts-expect-error: Steam internal variable
     const currency = typeof window.g_rgWalletInfo !== 'undefined' ? window.g_rgWalletInfo.wallet_currency : 1;
-    // @ts-ignore
+    // @ts-expect-error: Steam internal variable
     const country = typeof window.g_strCountryCode !== 'undefined' ? window.g_strCountryCode : 'US';
-    // @ts-ignore
+    // @ts-expect-error: Steam internal variable
     const language = typeof window.g_strLanguage !== 'undefined' ? window.g_strLanguage : 'english';
     
     while (start < totalCount) {
@@ -52,23 +70,23 @@
         const json = await res.json();
         
         if (json && json.success) {
-          // @ts-ignore
+          // @ts-expect-error: Steam internal variable
           if (json.assets && window.g_rgAssets) {
             for (const appid in json.assets) {
-              // @ts-ignore
+              // @ts-expect-error: Steam internal variable
               if (!window.g_rgAssets[appid]) window.g_rgAssets[appid] = {};
               for (const contextid in json.assets[appid]) {
-                // @ts-ignore
+                // @ts-expect-error: Steam internal variable
                 if (!window.g_rgAssets[appid][contextid]) window.g_rgAssets[appid][contextid] = {};
-                // @ts-ignore
+                // @ts-expect-error: Steam internal variable
                 Object.assign(window.g_rgAssets[appid][contextid], json.assets[appid][contextid]);
               }
             }
           }
           
-          // @ts-ignore
+          // @ts-expect-error: Steam internal variable
           if (json.listinginfo && window.g_rgListingInfo) {
-            // @ts-ignore
+            // @ts-expect-error: Steam internal variable
             Object.assign(window.g_rgListingInfo, json.listinginfo);
           }
 
@@ -100,7 +118,7 @@
   function force100Listings() {
     if (hasForced100) return;
     
-    // @ts-ignore
+    // @ts-expect-error: Steam internal variable
     const searchResults = window.g_oSearchResults;
     if (searchResults && searchResults.m_cPageSize < 100) {
       console.log("[Arcana] Forcing 100 listings...");
@@ -112,17 +130,14 @@
     }
   }
 
-  function parseMarketData(listingInfo: any, assets: any) {
+  function parseMarketData(listingInfo: Record<string, SteamListing>, assets: Record<string, Record<string, Record<string, SteamAsset>>>) {
     const marketData: Record<string, { wear: string; pattern: string }> = {};
 
     for (const listingId in listingInfo) {
       const info = listingInfo[listingId];
-      if (!info || !info.asset) continue;
+      if (!info?.asset) continue;
 
-      const assetId = info.asset.id;
-      const appid = info.asset.appid;
-      const contextid = info.asset.contextid;
-
+      const { id: assetId, appid, contextid } = info.asset;
       const asset = assets?.[appid]?.[contextid]?.[assetId];
       if (!asset) continue;
 
@@ -132,11 +147,11 @@
       // 1. Try asset_properties (More reliable/Universal)
       if (asset.asset_properties) {
         for (const prop of asset.asset_properties) {
-            if (prop.propertyid === 1 || prop.id === 1) { // Pattern
-              pattern = prop.int_value?.toString() || "";
-            } else if (prop.propertyid === 2 || prop.id === 2) { // Wear
-              wear = prop.float_value?.toString() || "";
-            }
+          if (prop.propertyid === 1 || prop.id === 1) { // Pattern
+            pattern = prop.int_value?.toString() || "";
+          } else if (prop.propertyid === 2 || prop.id === 2) { // Wear
+            wear = prop.float_value?.toString() || "";
+          }
         }
       }
 
@@ -165,9 +180,9 @@
       // Also check for 100 listings here
       force100Listings();
 
-      // @ts-ignore
+      // @ts-expect-error: Steam internal variable
       const assets = window.g_rgAssets;
-      // @ts-ignore
+      // @ts-expect-error: Steam internal variable
       const listingInfo = window.g_rgListingInfo;
 
       if (!assets || !listingInfo) return;
@@ -186,7 +201,7 @@
       window.dispatchEvent(new CustomEvent('SteamMarketDataLoaded', {
         detail: marketData
       }));
-    } catch (e) {
+    } catch {
       // Silent fail to avoid breaking Steam
     }
   }

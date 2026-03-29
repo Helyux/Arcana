@@ -6,9 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "lint": "eslint -c configs/eslint.config.js .",
     "preview": "vite preview",
-    "pack": "npm run build && web-ext build --source-dir dist --artifacts-dir packages --overwrite-dest"
+    "pack": "npm run build && web-ext build --source-dir dist --artifacts-dir packages --overwrite-dest",
+    "pack:source": "tar -cf packages/arcana-source.zip --format=zip src docs configs public package.json package-lock.json tsconfig.json vite.config.ts manifest.json eslint.config.js README.md .gitignore"
   },
   "dependencies": {
     "react": "^19.2.4",

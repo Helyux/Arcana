@@ -4,7 +4,7 @@ import { ListingBadge } from '../components/ListingBadge';
 import { PatternFilter } from '../components/PatternFilter';
 import '../index.css';
 
-let marketData = new Map<string, { wear: string; pattern: string }>();
+const marketData = new Map<string, { wear: string; pattern: string }>();
 let highlightPatterns: string[] = [];
 let patternFilterActive = false;
 const itemId = window.location.pathname.split('/').pop() || 'global';
@@ -162,8 +162,9 @@ if (searchResults) {
 }
 
 // Listen for data from the main world
-window.addEventListener('SteamMarketDataLoaded', (event: any) => {
-  const newItems = event.detail;
+window.addEventListener('SteamMarketDataLoaded', (event: Event) => {
+  const customEvent = event as CustomEvent;
+  const newItems = customEvent.detail;
   let hasChanges = false;
 
   for (const listingId in newItems) {
@@ -179,8 +180,9 @@ window.addEventListener('SteamMarketDataLoaded', (event: any) => {
 });
 
 // Listen for deep scan chunks
-window.addEventListener('SteamMarketDeepScanChunk', (event: any) => {
-  const { results_html, chunkData } = event.detail;
+window.addEventListener('SteamMarketDeepScanChunk', (event: Event) => {
+  const customEvent = event as CustomEvent;
+  const { results_html, chunkData } = customEvent.detail;
   
   // If no patterns are active, we do not want to violently dump thousands of items
   // into the DOM. We only pluck explicitly requested patterns.

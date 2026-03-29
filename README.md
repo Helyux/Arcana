@@ -11,7 +11,7 @@ A browser extension for CS2 that displays **Float Values** and **Pattern Templat
 
 ---
 
-[**Check the Roadmap**](ROADMAP.md) for upcoming features and future planning!
+[**Check the Roadmap**](docs/ROADMAP.md) for upcoming features and future planning!
 
 ## Browser Support
 
@@ -46,6 +46,8 @@ To install the extension permanently in Firefox:
 2. Open Firefox and go to `about:addons`
 3. **Drag and drop** the downloaded `.xpi` file into the page to install.
 
+Detailed build instructions for Mozilla reviewers can be found in [FIREFOX.md](docs/FIREFOX.md).
+
 ### Chrome / Edge / Brave
 
 1. **Build** the project locally (see above).
@@ -62,14 +64,15 @@ To install the extension permanently in Firefox:
 ## Project Structure
 
 ```
-src/
-├── components/
-│   ├── ListingBadge.tsx    # Float/Pattern badge UI
-│   └── PatternFilter.tsx   # Filter input + Deep Scan controls
-├── content/
-│   ├── isolated.tsx        # Isolated world: DOM injection, badge rendering, filtering
-│   └── main.ts             # Main world: Steam data extraction, deep scan fetcher
-└── index.css               # Injected styles (highlights, badge layout, filter rules)
+├── configs/            # Build and development configurations (TS, ESLint)
+├── docs/               # Project documentation (Roadmap, Firefox guide)
+├── public/             # Static assets (icons)
+├── src/
+│   ├── components/     # React UI components
+│   └── content/        # Content scripts (main world + isolated world)
+├── manifest.json       # Extension manifest
+├── package.json        # Dependencies and scripts
+└── vite.config.ts      # Vite bundler configuration
 ```
 
 ## Tech Stack
@@ -78,6 +81,8 @@ src/
 - **Vite** + **CRXJS** for extension bundling
 - **Tailwind CSS** for component styling
 
-## License
+## Contributing
+Contributions are welcome! Open an issue or submit a pull request.
 
-This project is licensed under the [GNU General Public License v3](LICENSE).
+## License
+GPLv3 License. See the LICENSE file for details.
