@@ -1,4 +1,4 @@
-# Arcana
+# <img src="public/icon.png" width="32" height="32"> Arcana
 
 A browser extension for CS2 that displays **Float Values** and **Pattern Templates** directly on Steam Community Market listings. Includes powerful filtering and an autonomous deep-scan engine to find specific patterns across thousands of listings.
 
@@ -34,25 +34,26 @@ npm run build
 
 The compiled extension will be in the `dist/` directory.
 
-### Load in Chrome
+### Firefox Desktop (Permanent Install)
 
-1. Navigate to `chrome://extensions`
-2. Enable **Developer mode**
-3. Click **Load unpacked** and select the `dist/` folder
+To install the extension permanently in Firefox:
 
-### Load in Firefox
+1. **Download** the signed version: [arcana-1.0.1.xpi](https://addons.mozilla.org/firefox/downloads/file/4744588/0dd5ddc0d798416e802f-1.0.1.xpi)
+2. Open Firefox and go to `about:addons`
+3. **Drag and drop** the downloaded `.xpi` file into the page to install.
+
+### Chrome / Edge / Brave
+
+1. **Build** the project locally (see above).
+2. Navigate to `chrome://extensions`
+3. Enable **Developer mode**
+4. Click **Load unpacked** and select the `dist/` folder
+
+### Development (Temporary Firefox Load)
 
 1. Navigate to `about:debugging#/runtime/this-firefox`
 2. Click **Load Temporary Add-on...**
-3. Select `dist/manifest.json`
-
-### Package for Firefox Signing
-
-```bash
-npm run pack
-```
-
-This builds the extension and creates a `packages/arcana-1.0.0.zip` ready for upload to the [Mozilla Add-on Developer Hub](https://addons.mozilla.org/en-US/developers/).
+3. Select `dist/manifest.json` (Note: This will disappear when Firefox restarts).
 
 ## Project Structure
 
@@ -75,4 +76,4 @@ src/
 
 ## License
 
-This project is private and not publicly licensed.
+This project is licensed under the [GNU General Public License v3](LICENSE).
