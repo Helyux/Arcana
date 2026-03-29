@@ -24,12 +24,14 @@
   let stopDeepScanRequested = false;
 
   window.addEventListener('ArcanaStartDeepScan', () => {
+    console.log("[Arcana] StartDeepScan event received");
     if (isDeepScanning) return;
     stopDeepScanRequested = false;
     startDeepScan();
   });
 
   window.addEventListener('ArcanaStopDeepScan', () => {
+    console.log("[Arcana] StopDeepScan event received");
     stopDeepScanRequested = true;
   });
 
@@ -41,6 +43,14 @@
     let start = window.g_oSearchResults?.m_iStart || 0;
     // @ts-expect-error: Steam internal variable
     const totalCount = window.g_oSearchResults?.m_cTotalCount || 0;
+    console.log(`[Arcana] Scan status: start=${start}, total=${totalCount}`);
+    
+    if (totalCount === 0) {
+      console.warn("[Arcana] No search results found to scan.");
+      isDeepScanning = false;
+      return;
+    }
+    
     start += 100;
 
     // @ts-expect-error: Steam internal variable

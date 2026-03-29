@@ -15,6 +15,7 @@ const badgeRoots = new Map<string, Root>();
 let remoteGroups: PatternGroup[] | null = null;
 let remoteDefaultString = '';
 let userHasEdited = false;
+let isInitialized = false;
 
 function toggleBodyFilterClass() {
   if (patternFilterActive) {
@@ -78,6 +79,7 @@ function initUserState() {
     }
 
     processListings(true);
+    isInitialized = true;
     injectFilter();
   });
 }
@@ -174,6 +176,7 @@ function applyHighlight(row: Element, data: { pattern: string }) {
 let filterRoot: Root | null = null;
 
 function injectFilter() {
+  if (!isInitialized) return;
   const target = document.querySelector('#market_buyorder_info') || document.querySelector('.market_listing_filter');
   if (!target || document.querySelector('.arcana-filter-root')) return;
 
@@ -306,12 +309,12 @@ window.addEventListener('SteamMarketDeepScanChunk', (event: Event) => {
 // Bootstrap: load remote patterns first, then user state
 initRemotePatterns().then(() => {
   initUserState();
+  
+  // Start periodic check ONLY after initialization
+  setInterval(() => {
+    processListings(false);
+    if (!document.querySelector('.arcana-filter-root')) {
+      injectFilter();
+    }
+  }, 1000);
 });
-
-// Periodic check
-setInterval(() => {
-  processListings(false);
-  if (!document.querySelector('.arcana-filter-root')) {
-    injectFilter();
-  }
-}, 1000);

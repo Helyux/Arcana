@@ -113,6 +113,27 @@ export const PatternFilter: React.FC<Props> = ({ itemId, defaultPatterns, defaul
     }
   };
 
+  const handleGroupClick = (group: PatternGroupInfo) => {
+    const groupPatterns = group.patterns.join(', ');
+    const isSelected = userEdited && patterns === groupPatterns;
+
+    if (isSelected) {
+      handleReset();
+      return;
+    }
+
+    setPatterns(groupPatterns);
+    setUserEdited(true);
+
+    chrome.storage.local.get(['arcana_filters', 'arcana_user_edited'], (result) => {
+      const filters = (result.arcana_filters as Record<string, string>) || {};
+      const editedStates = (result.arcana_user_edited as Record<string, boolean>) || {};
+      filters[itemId] = groupPatterns;
+      editedStates[itemId] = true;
+      chrome.storage.local.set({ arcana_filters: filters, arcana_user_edited: editedStates });
+    });
+  };
+
   const showingDefaults = hasRemoteDefaults && !userEdited;
 
   return (
@@ -131,41 +152,42 @@ export const PatternFilter: React.FC<Props> = ({ itemId, defaultPatterns, defaul
         )}
       </div>
 
-      {/* Group pills when showing defaults */}
-      {showingDefaults && defaultGroups && defaultGroups.length > 0 && (
+      {/* Group pills - now handles quick-select */}
+      {defaultGroups && defaultGroups.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {defaultGroups.map((group) => (
-            <span key={group.name} className="arcana-group-pill text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1" style={{ opacity: 0.8 }}>
-              <span>{group.icon}</span>
-              <span>{group.name.replace(/_/g, ' ')}</span>
-              <span className="opacity-50 ml-0.5">({group.patterns.length})</span>
-            </span>
-          ))}
+          {defaultGroups.map((group) => {
+            const isSelected = userEdited && patterns === group.patterns.join(', ');
+            return (
+              <button
+                key={group.name}
+                onClick={() => handleGroupClick(group)}
+                title={isSelected ? "Click to reset to all patterns" : `Quick-select ${group.name.replace(/_/g, ' ')} patterns`}
+                className={`arcana-group-pill text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 transition-all cursor-pointer hover:bg-white/5 active:translate-y-0.5 ${isSelected ? 'bg-purple-500/20 border-purple-500/60 shadow-[0_0_10px_rgba(168,85,247,0.2)]' : 'opacity-80 border-purple-500/20'
+                  }`}
+                style={{ all: 'unset', padding: '2px 8px', border: '1px solid currentColor', borderRadius: '999px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}
+              >
+                <span>{group.icon}</span>
+                <span>{group.name.replace(/_/g, ' ')}</span>
+                <span className="opacity-50 ml-0.5">({group.patterns.length})</span>
+              </button>
+            );
+          })}
         </div>
       )}
 
-      {/* Input row */}
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
+      {/* Input row - using strict inline styles to bypass any Steam CSS conflicts */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '12px', alignItems: 'center', width: '100%' }}>
+        <div style={{ position: 'relative', minWidth: 0 }}>
           <input
             type="text"
             value={userEdited ? patterns : ''}
             onChange={handleChange}
             placeholder={showingDefaults ? effectivePatterns : 'Enter patterns (e.g. 589, 12, 999)...'}
-            className={`w-full bg-white/5 border rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-purple-500/50 focus:bg-white/10 transition-all shadow-inner ${showingDefaults ? 'border-purple-500/20 placeholder:text-purple-300/30' : 'border-white/10 placeholder:text-white/20'
-              }`}
+            style={{ width: '100%', minWidth: 0, boxSizing: 'border-box', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(168,85,247,0.2)', borderRadius: '8px', padding: '8px 16px', fontSize: '14px', color: 'white', outline: 'none' }}
           />
         </div>
-        {userEdited && hasRemoteDefaults && (
-          <button
-            onClick={handleReset}
-            className="px-2 py-2 rounded-lg text-white/40 hover:text-purple-400 hover:bg-white/5 transition-all text-xs font-bold"
-            title="Reset to cs2pattern defaults"
-          >
-            ✕
-          </button>
-        )}
-        <div className="flex gap-2">
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
           <button
             onClick={toggleFilter}
             className={`px-4 py-2 rounded-lg font-bold tracking-wider text-[11px] uppercase transition-all duration-300 ${isFilterActive
