@@ -9,6 +9,10 @@ A browser extension for CS2 that displays **Float Values** and **Pattern Templat
 - **Instant Filter** — Toggle a filter to instantly hide all non-matching listings on the current page.
 - **Deep Scan** — Autonomously fetches *all* pages of listings from Steam's API, extracts only the rows matching your patterns, and injects them into the page. Non-matches are discarded in memory to keep your browser fast.
 
+---
+
+[**Check the Roadmap**](ROADMAP.md) for upcoming features and future planning!
+
 ## Browser Support
 
 | Browser | Status |
