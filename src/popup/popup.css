@@ -103,6 +103,32 @@ body {
   color: #c084fc;
 }
 
+.interval-input {
+  width: 60px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 4px;
+  color: #c084fc;
+  padding: 2px 6px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+  outline: none;
+}
+
+.interval-input:focus {
+  border-color: rgba(168, 85, 247, 0.6);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.settings-desc {
+  font-size: 10px;
+  color: #6b6b80;
+  line-height: 1.4;
+  margin-top: -2px;
+}
+
 /* Refresh Button */
 .refresh-btn {
   display: flex;

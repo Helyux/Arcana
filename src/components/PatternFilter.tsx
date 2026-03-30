@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { ListingBadge } from './ListingBadge';
 
 interface PatternGroupInfo {
   name: string;
@@ -14,6 +15,19 @@ interface Props {
 }
 
 type SortState = 'none' | 'asc' | 'desc';
+
+interface TickerEntry {
+  listingId: string;
+  wear: string;
+  pattern: string;
+  price: string;
+  rank: number | null;
+  matchInfo?: { name: string; icon: string } | null;
+  addedAt: number;
+  appId: string;
+  contextId: string;
+  assetId: string;
+}
 
 const nextSortState = (current: SortState): SortState => {
   if (current === 'none') return 'asc';
@@ -38,6 +52,8 @@ export const PatternFilter: React.FC<Props> = ({ itemId, defaultPatterns, defaul
   const [floatSort, setFloatSort] = useState<SortState>('none');
   const [rankSort, setRankSort] = useState<SortState>('none');
   const [rankingError, setRankingError] = useState<string>('');
+  const [livetickerActive, setLivetickerActive] = useState<boolean>(false);
+  const [tickerEntries, setTickerEntries] = useState<TickerEntry[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // The effective patterns: user's input takes priority, otherwise remote defaults
@@ -73,9 +89,39 @@ export const PatternFilter: React.FC<Props> = ({ itemId, defaultPatterns, defaul
         total: customEvent.detail.total
       });
     };
+
+    const onNewTickerListings = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const newListings = customEvent.detail;
+      setTickerEntries(prev => {
+        const newer = [...prev];
+        for (const id in newListings) {
+          if (!newer.find(te => te.listingId === id)) {
+            newer.unshift(newListings[id]); // Newest at top
+          }
+        }
+        return newer.slice(0, 50); // Keep max 50
+      });
+    };
+
     window.addEventListener('ArcanaScanProgress', onProgress);
-    return () => window.removeEventListener('ArcanaScanProgress', onProgress);
+    window.addEventListener('ArcanaTickerNewListings', onNewTickerListings);
+    
+    return () => {
+      window.removeEventListener('ArcanaScanProgress', onProgress);
+      window.removeEventListener('ArcanaTickerNewListings', onNewTickerListings);
+    };
   }, [itemId]);
+
+  // Clean up old entries periodically
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = Date.now();
+      const expiryTime = 15 * 60 * 1000; // 15 minutes
+      setTickerEntries(prev => prev.filter(te => (now - te.addedAt) < expiryTime));
+    }, 10000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Dispatch pattern changes to the content script
   useEffect(() => {
@@ -230,6 +276,43 @@ export const PatternFilter: React.FC<Props> = ({ itemId, defaultPatterns, defaul
     window.dispatchEvent(new CustomEvent('ArcanaRankingUpdate', {
       detail: { ranking: '' }
     }));
+  };
+
+  const toggleLiveticker = () => {
+    const newState = !livetickerActive;
+    setLivetickerActive(newState);
+    if (newState) {
+      chrome.storage.local.get(['arcana_polling_interval'], (res) => {
+        const interval = res.arcana_polling_interval || 15;
+        window.dispatchEvent(new CustomEvent('ArcanaStartLiveticker', {
+          detail: { interval }
+        }));
+      });
+    } else {
+      window.dispatchEvent(new CustomEvent('ArcanaStopLiveticker'));
+    }
+  };
+
+  const removeTickerEntry = (id: string) => {
+    setTickerEntries(prev => prev.filter(te => te.listingId !== id));
+  };
+
+  const handleBuyNow = (entry: TickerEntry) => {
+    window.dispatchEvent(new CustomEvent('ArcanaBuyListing', {
+      detail: {
+        listingId: entry.listingId,
+        appId: entry.appId,
+        contextId: entry.contextId,
+        assetId: entry.assetId
+      }
+    }));
+  };
+
+  const formatTimeAgo = (ts: number) => {
+    const sec = Math.floor((Date.now() - ts) / 1000);
+    if (sec < 10) return 'Just now';
+    if (sec < 60) return `${sec}s ago`;
+    return `${Math.floor(sec / 60)}m ago`;
   };
 
   const showingDefaults = hasRemoteDefaults && !userEdited;
@@ -425,7 +508,75 @@ export const PatternFilter: React.FC<Props> = ({ itemId, defaultPatterns, defaul
           >
             {hasRanking ? 'RANKING ✓' : 'RANKING'}
           </button>
+
+          <button
+            onClick={toggleLiveticker}
+            className={`px-4 py-2 rounded-lg font-bold tracking-wider text-[11px] uppercase transition-all duration-300 whitespace-nowrap ${livetickerActive
+                ? 'bg-green-500/20 text-green-300 shadow-[0_0_15px_rgba(34,197,94,0.2)] border border-green-500/40'
+                : btnInactive
+              }`}
+            title="Toggle background liveticker for new listings"
+          >
+            {livetickerActive ? 'LIVETICKER ●' : 'LIVETICKER'}
+          </button>
         </div>
+
+        {/* Liveticker Panel */}
+        {tickerEntries.length > 0 && (
+          <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '11px', color: '#c084fc', textTransform: 'uppercase', letterSpacing: '0.2em', fontWeight: 900 }}>🔊 Live Ticker</h3>
+              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '10px' }}>{tickerEntries.length} Items</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {tickerEntries.map(entry => (
+                <div key={entry.listingId} style={{
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(168,85,247,0.1)',
+                  borderRadius: '12px',
+                  padding: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  position: 'relative',
+                  backdropFilter: 'blur(10px)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 900, color: '#4ade80' }}>{entry.price}</span>
+                      <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' }}>Disc. {formatTimeAgo(entry.addedAt)}</span>
+                    </div>
+                    <button
+                      onClick={() => removeTickerEntry(entry.listingId)}
+                      style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.2)', cursor: 'pointer', fontSize: '16px', padding: '0 4px' }}
+                    >×</button>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                    <ListingBadge wear={entry.wear} pattern={entry.pattern} isMatched={!!entry.matchInfo} matchInfo={entry.matchInfo} rank={entry.rank} />
+                    <button
+                      onClick={() => handleBuyNow(entry)}
+                      style={{ 
+                        background: 'linear-gradient(to bottom, #75b022 5%, #588a1b 95%)',
+                        border: 'none',
+                        color: '#d2ef8c',
+                        padding: '6px 14px',
+                        borderRadius: '4px',
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                        flexShrink: 0
+                      }}
+                    >
+                      Buy Now
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Ranking Modal */}

@@ -20,6 +20,60 @@ let isInitialized = false;
 // Ranking data: pattern string → rank number
 let rankingMap = new Map<string, number>();
 
+// Notification sound for Liveticker (Web Audio API synthesis)
+let lastChimeTime = 0;
+function playChime() {
+  const nowTime = Date.now();
+  if (nowTime - lastChimeTime < 500) return; // Prevent multiple sounds at once
+  lastChimeTime = nowTime;
+
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const now = audioCtx.currentTime;
+    
+    // 1. Bass Body (90Hz deep thud)
+    const bodyOsc = audioCtx.createOscillator();
+    const bodyGain = audioCtx.createGain();
+    bodyOsc.connect(bodyGain);
+    bodyGain.connect(audioCtx.destination);
+    bodyOsc.type = 'sine';
+    bodyOsc.frequency.setValueAtTime(90, now);
+    bodyGain.gain.setValueAtTime(0.4, now);
+    bodyGain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+
+    // 2. Crisp Click 1 (1800Hz)
+    const click1 = audioCtx.createOscillator();
+    const clickGain1 = audioCtx.createGain();
+    click1.connect(clickGain1);
+    clickGain1.connect(audioCtx.destination);
+    click1.type = 'sine';
+    click1.frequency.setValueAtTime(1800, now);
+    clickGain1.gain.setValueAtTime(0.35, now);
+    clickGain1.gain.exponentialRampToValueAtTime(0.01, now + 0.04);
+
+    // 3. Crisp Click 2 (1600Hz at 0.08s delay)
+    const click2 = audioCtx.createOscillator();
+    const clickGain2 = audioCtx.createGain();
+    click2.connect(clickGain2);
+    clickGain2.connect(audioCtx.destination);
+    click2.type = 'sine';
+    click2.frequency.setValueAtTime(1600, now + 0.08);
+    clickGain2.gain.setValueAtTime(0, now);
+    clickGain2.gain.setValueAtTime(0.35, now + 0.08);
+    clickGain2.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+
+    bodyOsc.start(now);
+    click1.start(now);
+    click2.start(now + 0.08);
+    
+    bodyOsc.stop(now + 0.6);
+    click1.stop(now + 0.05);
+    click2.stop(now + 0.13);
+  } catch (e) {
+    console.error("[Arcana] Sound synthesis failed:", e);
+  }
+}
+
 function toggleBodyFilterClass() {
   if (patternFilterActive) {
     document.body.classList.add('arcana-filtering-active');
@@ -102,6 +156,12 @@ function initUserState() {
       rankingMap = buildRankingMap(rankings[itemId]);
     }
 
+    // Load polling interval
+    chrome.storage.local.get(['arcana_polling_interval'], (res) => {
+      const interval = res.arcana_polling_interval || 15;
+      window.dispatchEvent(new CustomEvent('ArcanaUpdatePollingInterval', { detail: { interval } }));
+    });
+
     processListings(true);
     isInitialized = true;
     injectFilter();
@@ -130,6 +190,28 @@ window.addEventListener('ArcanaRankingUpdate', (e: Event) => {
   const { ranking } = customEvent.detail;
   rankingMap = buildRankingMap(ranking || '');
   processListings(true);
+});
+
+// Listen for new listings from the liveticker (Main World)
+window.addEventListener('ArcanaLivetickerNewListings', (e: Event) => {
+  const customEvent = e as CustomEvent;
+  const newListings = customEvent.detail;
+  
+  // Play sound
+  playChime();
+
+  // Enrich with rank and group info for UI
+  for (const id in newListings) {
+    const data = newListings[id];
+    data.matchInfo = highlightPatterns.includes(data.pattern) ? (patternGroupMap.get(data.pattern) || null) : null;
+    data.rank = rankingMap.get(data.pattern) ?? null;
+    data.addedAt = Date.now();
+  }
+
+  // Notify React component
+  window.dispatchEvent(new CustomEvent('ArcanaTickerNewListings', {
+    detail: newListings
+  }));
 });
 
 // Store original DOM order for sort reset
@@ -246,6 +328,11 @@ chrome.storage.onChanged.addListener((changes: { [key: string]: chrome.storage.S
     const rankings = (changes.arcana_rankings.newValue as Record<string, string>) || {};
     rankingMap = buildRankingMap(rankings[itemId] || '');
     needsUpdate = true;
+  }
+
+  if (changes.arcana_polling_interval) {
+    const interval = changes.arcana_polling_interval.newValue || 15;
+    window.dispatchEvent(new CustomEvent('ArcanaUpdatePollingInterval', { detail: { interval } }));
   }
 
   if (needsUpdate) {

@@ -52,28 +52,23 @@ const groupColors: Record<string, { bg: string; text: string; border: string; gl
 const defaultColor = { bg: 'rgba(239,68,68,0.15)', text: '#f87171', border: 'rgba(239,68,68,0.4)', glow: 'rgba(239,68,68,0.25)' };
 
 export const ListingBadge: React.FC<Props> = ({ wear, pattern, isMatched, matchInfo, rank }) => {
-  const neutralStyle = "bg-black/30 text-white/90 border-white/20 hover:bg-black/50 hover:text-white h-6";
+  const baseBadgeClass = "px-2 h-6 flex items-center rounded border backdrop-blur-md transition-all duration-300 text-[11px] font-bold tracking-tight shadow-lg select-none pointer-events-none font-sans";
+  const neutralStyle = "bg-black/30 text-white/90 border-white/20 hover:bg-black/50 hover:text-white";
 
   const colors = matchInfo ? (groupColors[matchInfo.name] || defaultColor) : defaultColor;
-
-  const patternStyle = isMatched
-    ? `h-6`
-    : neutralStyle;
 
   const patternInlineStyle = isMatched ? {
     background: colors.bg,
     color: colors.text,
     borderColor: colors.border,
     boxShadow: `0 0 10px ${colors.glow}`,
-    borderWidth: '1px',
-    borderStyle: 'solid',
   } : undefined;
 
   return (
-    <div className="arcana-badge-container flex flex-wrap items-center gap-2 mt-2 select-none pointer-events-none font-sans">
+    <div className="arcana-badge-container flex flex-wrap items-center gap-2 mt-2">
       {wear && (
         <div
-          className={`px-2 flex items-center rounded border backdrop-blur-md transition-all duration-300 text-[11px] font-bold tracking-tight shadow-lg ${neutralStyle}`}
+          className={`${baseBadgeClass} ${neutralStyle}`}
           style={getFloatColor(wear) ? { color: getFloatColor(wear), borderColor: getFloatColor(wear) + '66' } : undefined}
         >
           <span className="opacity-50 mr-1.5 text-[10px] uppercase font-black" style={getFloatColor(wear) ? { color: getFloatColor(wear), opacity: 0.6 } : undefined}>FLOAT</span>
@@ -82,7 +77,7 @@ export const ListingBadge: React.FC<Props> = ({ wear, pattern, isMatched, matchI
       )}
       {pattern && (
         <div
-          className={`px-2 flex items-center rounded backdrop-blur-md transition-all duration-300 text-[11px] font-bold tracking-tight shadow-lg ${patternStyle}`}
+          className={`${baseBadgeClass} ${isMatched ? '' : neutralStyle}`}
           style={patternInlineStyle}
         >
           <span className={`mr-1.5 text-[10px] uppercase font-black`} style={isMatched ? { color: colors.text, opacity: 0.6 } : { opacity: 0.5 }}>PATTERN</span>
@@ -91,13 +86,11 @@ export const ListingBadge: React.FC<Props> = ({ wear, pattern, isMatched, matchI
       )}
       {isMatched && matchInfo && (
         <div
-          className="px-2 h-6 flex items-center rounded backdrop-blur-md transition-all duration-300 text-[11px] font-bold tracking-tight shadow-lg"
+          className={baseBadgeClass}
           style={{
             background: colors.bg,
             color: colors.text,
             borderColor: colors.border,
-            borderWidth: '1px',
-            borderStyle: 'solid',
             boxShadow: `0 0 10px ${colors.glow}`,
           }}
         >
@@ -107,7 +100,7 @@ export const ListingBadge: React.FC<Props> = ({ wear, pattern, isMatched, matchI
       )}
       {rank != null && (
         <div
-          className={`px-2 h-6 flex items-center rounded border backdrop-blur-md transition-all duration-300 text-[11px] font-bold tracking-tight shadow-lg ${rank <= 30 ? '' : neutralStyle}`}
+          className={`${baseBadgeClass} ${rank <= 30 ? '' : neutralStyle}`}
           style={rank <= 30
             ? { color: '#facc15', borderColor: 'rgba(250,204,21,0.4)', background: 'rgba(0,0,0,0.3)' }
             : undefined

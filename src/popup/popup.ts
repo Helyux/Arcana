@@ -5,6 +5,7 @@ const refreshBtn = document.getElementById('refreshBtn')!;
 const refreshIcon = document.getElementById('refreshIcon')!;
 const refreshText = document.getElementById('refreshText')!;
 const versionEl = document.getElementById('version')!;
+const pollingIntervalInput = document.getElementById('pollingInterval') as HTMLInputElement;
 
 function formatTimeAgo(timestamp: number): string {
   if (!timestamp) return 'Never';
@@ -52,4 +53,22 @@ async function handleRefresh() {
 const manifest = chrome.runtime.getManifest();
 versionEl.textContent = `v${manifest.version}`;
 refreshBtn.addEventListener('click', handleRefresh);
+
+// Load and save polling interval
+chrome.storage.local.get(['arcana_polling_interval'], (result) => {
+  if (result.arcana_polling_interval) {
+    pollingIntervalInput.value = result.arcana_polling_interval.toString();
+  }
+});
+
+pollingIntervalInput.addEventListener('change', () => {
+  const val = parseInt(pollingIntervalInput.value, 10);
+  if (!isNaN(val) && val >= 5) {
+    chrome.storage.local.set({ arcana_polling_interval: val });
+  } else {
+    pollingIntervalInput.value = "15";
+    chrome.storage.local.set({ arcana_polling_interval: 15 });
+  }
+});
+
 updateStatus();
