@@ -29,9 +29,9 @@
 .arcana-match-highlight {
   position: relative;
   transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  background: linear-gradient(90deg, rgba(239, 68, 68, 0.25) 0%, rgba(239, 68, 68, 0.1) 100%) !important;
-  box-shadow: inset 4px 0 0 0 #ef4444, inset 10px 0 30px -10px rgba(239, 68, 68, 0.4) !important;
-  outline: 1.5px solid #ef4444 !important;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%) !important;
+  box-shadow: inset 4px 0 0 0 white, inset 10px 0 30px -10px rgba(255, 255, 255, 0.2) !important;
+  outline: 1.5px solid white !important;
   outline-offset: -1.5px;
 }
 
@@ -43,7 +43,7 @@
   /* Move away from the edge to avoid clipping */
   font-size: 9px;
   font-weight: 900;
-  color: #f87171;
+  color: #ffffff;
   letter-spacing: 0.1em;
   opacity: 1;
   animation: pulse-light 2s infinite;

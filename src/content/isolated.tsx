@@ -17,6 +17,9 @@ let remoteDefaultString = '';
 let userHasEdited = false;
 let isInitialized = false;
 
+// Ranking data: pattern string → rank number
+let rankingMap = new Map<string, number>();
+
 function toggleBodyFilterClass() {
   if (patternFilterActive) {
     document.body.classList.add('arcana-filtering-active');
@@ -52,16 +55,32 @@ async function initRemotePatterns() {
   }
 }
 
+// Build ranking map from stored string (one pattern per line)
+function buildRankingMap(rankingStr: string): Map<string, number> {
+  const map = new Map<string, number>();
+  if (!rankingStr) return map;
+  const lines = rankingStr.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const pattern = lines[i].trim();
+    if (pattern) {
+      map.set(pattern, i + 1); // rank is 1-based
+    }
+  }
+  return map;
+}
+
 // Load user state from storage, then apply patterns
 function initUserState() {
-  chrome.storage.local.get(['arcana_filters', 'arcana_filter_active', 'arcana_user_edited'], (result: {
+  chrome.storage.local.get(['arcana_filters', 'arcana_filter_active', 'arcana_user_edited', 'arcana_rankings'], (result: {
     arcana_filters?: Record<string, string>;
     arcana_filter_active?: Record<string, boolean>;
     arcana_user_edited?: Record<string, boolean>;
+    arcana_rankings?: Record<string, string>;
   }) => {
     const filters = result.arcana_filters || {};
     const activeStates = result.arcana_filter_active || {};
     const editedStates = result.arcana_user_edited || {};
+    const rankings = result.arcana_rankings || {};
 
     patternFilterActive = !!activeStates[itemId];
     toggleBodyFilterClass();
@@ -76,6 +95,11 @@ function initUserState() {
       highlightPatterns = remoteDefaultString.split(',').map((p: string) => p.trim()).filter(Boolean);
     } else if (filters[itemId]) {
       highlightPatterns = filters[itemId].split(',').map((p: string) => p.trim()).filter(Boolean);
+    }
+
+    // Load rankings
+    if (rankings[itemId]) {
+      rankingMap = buildRankingMap(rankings[itemId]);
     }
 
     processListings(true);
@@ -98,6 +122,89 @@ window.addEventListener('ArcanaPatternUpdate', (e: Event) => {
     highlightPatterns = (patterns as string).split(',').map((p: string) => p.trim()).filter(Boolean);
   }
   processListings(true);
+});
+
+// Listen for ranking updates from the filter component
+window.addEventListener('ArcanaRankingUpdate', (e: Event) => {
+  const customEvent = e as CustomEvent;
+  const { ranking } = customEvent.detail;
+  rankingMap = buildRankingMap(ranking || '');
+  processListings(true);
+});
+
+// Store original DOM order for sort reset
+let originalRowOrder: string[] | null = null;
+
+function captureOriginalOrder(container: Element) {
+  if (originalRowOrder) return;
+  const rows = container.querySelectorAll('.market_listing_row');
+  originalRowOrder = Array.from(rows).map(r => r.id);
+}
+
+function restoreOriginalOrder(container: Element) {
+  if (!originalRowOrder) return;
+  for (const id of originalRowOrder) {
+    const row = container.querySelector(`#${CSS.escape(id)}`);
+    if (row) container.appendChild(row);
+  }
+}
+
+// Listen for "Order by Float" button (3-state: none/asc/desc)
+window.addEventListener('ArcanaOrderByFloat', (e: Event) => {
+  const container = document.querySelector('#searchResultsRows');
+  if (!container) return;
+  const direction = (e as CustomEvent).detail?.direction || 'none';
+
+  if (direction === 'none') {
+    restoreOriginalOrder(container);
+    return;
+  }
+
+  captureOriginalOrder(container);
+  const rows = Array.from(container.querySelectorAll('.market_listing_row')) as HTMLElement[];
+
+  rows.sort((a, b) => {
+    const idA = a.id.split('_').pop() || '';
+    const idB = b.id.split('_').pop() || '';
+    const dataA = marketData.get(idA);
+    const dataB = marketData.get(idB);
+    const floatA = dataA ? parseFloat(dataA.wear) : Infinity;
+    const floatB = dataB ? parseFloat(dataB.wear) : Infinity;
+    return direction === 'asc' ? floatA - floatB : floatB - floatA;
+  });
+
+  for (const row of rows) {
+    container.appendChild(row);
+  }
+});
+
+// Listen for "Order by Rank" button (3-state: none/asc/desc)
+window.addEventListener('ArcanaOrderByRank', (e: Event) => {
+  const container = document.querySelector('#searchResultsRows');
+  if (!container) return;
+  const direction = (e as CustomEvent).detail?.direction || 'none';
+
+  if (direction === 'none') {
+    restoreOriginalOrder(container);
+    return;
+  }
+
+  captureOriginalOrder(container);
+  const rows = Array.from(container.querySelectorAll('.market_listing_row')) as HTMLElement[];
+
+  rows.sort((a, b) => {
+    const idA = a.id.split('_').pop() || '';
+    const idB = b.id.split('_').pop() || '';
+    const dataA = marketData.get(idA);
+    const dataB = marketData.get(idB);
+    const rankA = dataA ? (rankingMap.get(dataA.pattern) ?? Infinity) : Infinity;
+    const rankB = dataB ? (rankingMap.get(dataB.pattern) ?? Infinity) : Infinity;
+    return direction === 'asc' ? rankA - rankB : rankB - rankA;
+  });
+
+  for (const row of rows) {
+    container.appendChild(row);
+  }
 });
 
 // Listen for storage changes from other tabs/extension
@@ -132,6 +239,12 @@ chrome.storage.onChanged.addListener((changes: { [key: string]: chrome.storage.S
     if (!userHasEdited && remoteDefaultString) {
       highlightPatterns = remoteDefaultString.split(',').map((p: string) => p.trim()).filter(Boolean);
     }
+    needsUpdate = true;
+  }
+
+  if (changes.arcana_rankings) {
+    const rankings = (changes.arcana_rankings.newValue as Record<string, string>) || {};
+    rankingMap = buildRankingMap(rankings[itemId] || '');
     needsUpdate = true;
   }
 
@@ -230,6 +343,7 @@ function renderBadge(row: Element, data: { wear: string, pattern: string }, list
 
   const isMatched = highlightPatterns.includes(data.pattern);
   const matchInfo = isMatched ? (patternGroupMap.get(data.pattern) || null) : null;
+  const rank = rankingMap.get(data.pattern) ?? null;
 
   let root = badgeRoots.get(listingId);
   if (!root || !document.body.contains(rootContainer)) {
@@ -239,7 +353,7 @@ function renderBadge(row: Element, data: { wear: string, pattern: string }, list
 
   root.render(
     <React.StrictMode>
-      <ListingBadge wear={data.wear} pattern={data.pattern} isMatched={isMatched} matchInfo={matchInfo} />
+      <ListingBadge wear={data.wear} pattern={data.pattern} isMatched={isMatched} matchInfo={matchInfo} rank={rank} />
     </React.StrictMode>
   );
 }
