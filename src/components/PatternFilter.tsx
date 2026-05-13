@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { ListingBadge } from './ListingBadge';
+import { getGithubLink } from '../services/patternDb';
 
 interface PatternGroupInfo {
   name: string;
@@ -12,6 +13,8 @@ interface Props {
   defaultPatterns?: string;
   defaultGroups?: PatternGroupInfo[];
   hasRemoteDefaults?: boolean;
+  skinName?: string;
+  weaponName?: string;
 }
 
 type SortState = 'none' | 'asc' | 'desc';
@@ -41,7 +44,7 @@ const sortLabel = (base: string, state: SortState): string => {
   return base;
 };
 
-export const PatternFilter: React.FC<Props> = ({ itemId, defaultPatterns, defaultGroups, hasRemoteDefaults }) => {
+export const PatternFilter: React.FC<Props> = ({ itemId, defaultPatterns, defaultGroups, hasRemoteDefaults, skinName, weaponName }) => {
   const [patterns, setPatterns] = useState<string>('');
   const [isFilterActive, setIsFilterActive] = useState<boolean>(false);
   const [userEdited, setUserEdited] = useState<boolean>(false);
@@ -54,6 +57,7 @@ export const PatternFilter: React.FC<Props> = ({ itemId, defaultPatterns, defaul
   const [rankingError, setRankingError] = useState<string>('');
   const [livetickerActive, setLivetickerActive] = useState<boolean>(false);
   const [tickerEntries, setTickerEntries] = useState<TickerEntry[]>([]);
+  const [githubLink, setGithubLink] = useState<string>('https://github.com/Helyux/cs2pattern/blob/master/cs2pattern/pattern.json');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // The effective patterns: user's input takes priority, otherwise remote defaults
@@ -122,6 +126,13 @@ export const PatternFilter: React.FC<Props> = ({ itemId, defaultPatterns, defaul
     }, 10000);
     return () => clearInterval(timer);
   }, []);
+
+  // Update GitHub link when item changes
+  useEffect(() => {
+    if (skinName && weaponName) {
+      getGithubLink(skinName, weaponName).then(setGithubLink);
+    }
+  }, [skinName, weaponName]);
 
   // Dispatch pattern changes to the content script
   useEffect(() => {
@@ -315,7 +326,9 @@ export const PatternFilter: React.FC<Props> = ({ itemId, defaultPatterns, defaul
     return `${Math.floor(sec / 60)}m ago`;
   };
 
-  const showingDefaults = hasRemoteDefaults && !userEdited;
+  const isFullDefault = patterns === defaultPatterns;
+  const isGroupDefault = defaultGroups?.some(g => patterns === g.patterns.join(', '));
+  const showingDefaults = hasRemoteDefaults && (!userEdited || isFullDefault || isGroupDefault);
 
   // Button style helpers
   const btnInactive = 'bg-white/5 text-white/50 border border-white/10 hover:bg-white/10 hover:text-white/80';
@@ -412,10 +425,15 @@ export const PatternFilter: React.FC<Props> = ({ itemId, defaultPatterns, defaul
             <span className="text-[11px] uppercase tracking-[0.2em] font-black text-purple-400">ARCANA FILTER</span>
           </div>
           {showingDefaults && (
-            <span className="text-[10px] text-purple-400/60 font-medium flex items-center gap-1">
+            <a 
+              href={githubLink} 
+              target="_blank" 
+              rel="noopener" 
+              className="text-[10px] text-purple-300 bg-purple-500/20 border border-purple-500/40 px-2 py-0.5 rounded-full font-bold flex items-center gap-1 no-underline hover:bg-purple-500/30 hover:border-purple-500/60 transition-all shadow-[0_0_10px_rgba(168,85,247,0.1)]"
+            >
               <span>🔮</span>
               <span>cs2pattern defaults</span>
-            </span>
+            </a>
           )}
         </div>
 

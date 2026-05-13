@@ -116,6 +116,62 @@ export async function getAllPatternIds(skinName: string, weaponName: string): Pr
   return allIds.join(', ');
 }
 
+export async function getGithubLink(skin: string, weapon: string): Promise<string> {
+  const baseUrl = 'https://github.com/Helyux/cs2pattern/blob/master/cs2pattern/pattern.json';
+  try {
+    const res = await fetch(PATTERN_URL);
+    if (!res.ok) return baseUrl;
+    const text = await res.text();
+    const lines = text.split('\n');
+
+    const skinKey = `"${skin.toLowerCase().trim()}":`;
+    const weaponKey = `"${weapon.toLowerCase().trim()}":`;
+
+    let skinLine = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes(skinKey)) {
+        skinLine = i + 1;
+        break;
+      }
+    }
+
+    if (skinLine === -1) return baseUrl;
+
+    let weaponLine = -1;
+    for (let i = skinLine; i < lines.length; i++) {
+      // If we hit another skin (2-space indent), stop
+      // Match something like   "abyss": {
+      if (lines[i].match(/^ {2}"[^"]+": \{/)) break;
+
+      if (lines[i].includes(weaponKey)) {
+        weaponLine = i + 1;
+        break;
+      }
+    }
+
+    return `${baseUrl}#L${weaponLine !== -1 ? weaponLine : skinLine}`;
+  } catch {
+    return baseUrl;
+  }
+}
+
+export interface SupportedSkin {
+  skin: string;
+  weapons: string[];
+}
+
+export async function getSupportedSkins(): Promise<SupportedSkin[]> {
+  await ensureLoaded();
+  const db = cachedPatternDb;
+  if (!db) return [];
+
+  const skins = Object.keys(db).sort();
+  return skins.map(skin => ({
+    skin,
+    weapons: Object.keys(db[skin]).sort()
+  }));
+}
+
 export async function getLastUpdated(): Promise<number> {
   const stored = await loadFromStorage();
   return stored.lastUpdated;

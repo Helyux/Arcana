@@ -1,4 +1,4 @@
-import { refreshDatabase, getLastUpdated } from '../services/patternDb';
+import { refreshDatabase, getLastUpdated, getSupportedSkins, type SupportedSkin } from '../services/patternDb';
 
 const lastUpdatedEl = document.getElementById('lastUpdated')!;
 const refreshBtn = document.getElementById('refreshBtn')!;
@@ -6,6 +6,8 @@ const refreshIcon = document.getElementById('refreshIcon')!;
 const refreshText = document.getElementById('refreshText')!;
 const versionEl = document.getElementById('version')!;
 const pollingIntervalInput = document.getElementById('pollingInterval') as HTMLInputElement;
+const skinSearchInput = document.getElementById('skinSearch') as HTMLInputElement;
+const skinListContainer = document.getElementById('skinList')!;
 
 function formatTimeAgo(timestamp: number): string {
   if (!timestamp) return 'Never';
@@ -24,7 +26,71 @@ function formatTimeAgo(timestamp: number): string {
 async function updateStatus() {
   const timestamp = await getLastUpdated();
   lastUpdatedEl.textContent = formatTimeAgo(timestamp);
+  await populateSkins();
 }
+
+
+
+function getMarketUrl(skin: string, weapon: string): string {
+  const query = encodeURIComponent(`${weapon} ${skin}`);
+  return `https://steamcommunity.com/market/search?appid=730&q=${query}`;
+}
+
+let allSkins: SupportedSkin[] = [];
+
+function capitalize(s: string): string {
+  return s.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+}
+
+async function populateSkins() {
+  allSkins = await getSupportedSkins();
+  renderSkins(allSkins);
+}
+
+function renderSkins(skins: SupportedSkin[]) {
+  skinListContainer.innerHTML = '';
+  
+  if (skins.length === 0) {
+    skinListContainer.innerHTML = '<p class="no-results">No skins found.</p>';
+    return;
+  }
+
+  skins.forEach(s => {
+    const skinDiv = document.createElement('div');
+    skinDiv.className = 'skin-item';
+    
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'skin-name';
+    nameSpan.textContent = capitalize(s.skin);
+    skinDiv.appendChild(nameSpan);
+
+    const weaponsDiv = document.createElement('div');
+    weaponsDiv.className = 'skin-weapons';
+    
+    s.weapons.forEach(w => {
+      const link = document.createElement('a');
+      link.href = getMarketUrl(s.skin, w);
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.className = 'weapon-link';
+      link.title = `View ${capitalize(w)} | ${capitalize(s.skin)} on Steam Market`;
+      link.textContent = w.toUpperCase();
+      weaponsDiv.appendChild(link);
+    });
+    
+    skinDiv.appendChild(weaponsDiv);
+    skinListContainer.appendChild(skinDiv);
+  });
+}
+
+skinSearchInput.addEventListener('input', () => {
+  const query = skinSearchInput.value.toLowerCase().trim();
+  const filtered = allSkins.filter(s => 
+    s.skin.toLowerCase().includes(query) || 
+    s.weapons.some(w => w.toLowerCase().includes(query))
+  );
+  renderSkins(filtered);
+});
 
 async function handleRefresh() {
   refreshBtn.classList.add('loading');

@@ -14,6 +14,8 @@ const badgeRoots = new Map<string, Root>();
 // Remote pattern data
 let remoteGroups: PatternGroup[] | null = null;
 let remoteDefaultString = '';
+let skinName = '';
+let weaponName = '';
 let userHasEdited = false;
 let isInitialized = false;
 
@@ -105,6 +107,8 @@ async function initRemotePatterns() {
   if (groups && groups.length > 0) {
     remoteGroups = groups;
     remoteDefaultString = groups.flatMap(g => g.pattern).join(', ');
+    skinName = parsed.skin;
+    weaponName = parsed.weapon;
     patternGroupMap = buildPatternGroupMap();
   }
 }
@@ -398,6 +402,8 @@ function injectFilter() {
         defaultPatterns={remoteDefaultString}
         defaultGroups={groupsForFilter}
         hasRemoteDefaults={!!(remoteGroups && remoteGroups.length > 0)}
+        skinName={skinName}
+        weaponName={weaponName}
       />
     </React.StrictMode>
   );

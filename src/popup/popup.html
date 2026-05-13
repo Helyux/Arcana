@@ -9,41 +9,61 @@
 <body>
   <div class="popup-container">
     <header class="popup-header">
-      <img src="/icon.png" alt="Arcana" class="popup-logo" width="28" height="28">
+      <a href="https://steamcommunity.com/market/search?appid=730" target="_blank" rel="noopener" title="Open Steam Market" class="logo-link">
+        <img src="/icon.png" alt="Arcana" class="popup-logo" width="28" height="28">
+      </a>
       <div class="popup-title">
         <h1>Arcana</h1>
         <span class="popup-version" id="version"></span>
       </div>
     </header>
 
-    <section class="popup-section">
-      <div class="section-header">
-        <span class="section-icon">🔊</span>
-        <span class="section-title">Liveticker Settings</span>
-      </div>
-      <div class="section-body">
-        <div class="status-row">
-          <span class="status-label">Interval (seconds)</span>
-          <input type="number" id="pollingInterval" class="interval-input" min="5" max="3600" value="15">
+    <div class="popup-top-row">
+      <section class="popup-section">
+        <div class="section-header">
+          <span class="section-icon">🔊</span>
+          <span class="section-title">Liveticker Settings</span>
         </div>
-        <p class="settings-desc">How often to refresh the liveticker in the background.</p>
-      </div>
-    </section>
+        <div class="section-body">
+          <div class="status-row">
+            <span class="status-label">Interval (seconds)</span>
+            <input type="number" id="pollingInterval" class="interval-input" min="5" max="3600" value="15">
+          </div>
+          <p class="settings-desc">How often to refresh the liveticker in the background.</p>
+        </div>
+      </section>
 
-    <section class="popup-section">
+      <section class="popup-section">
+        <div class="section-header">
+          <span class="section-icon">🔮</span>
+          <span class="section-title">Pattern Database</span>
+        </div>
+        <div class="section-body">
+          <div class="status-row">
+            <span class="status-label">Last updated</span>
+            <span class="status-value" id="lastUpdated">Never</span>
+          </div>
+          <button id="refreshBtn" class="refresh-btn">
+            <span class="refresh-icon" id="refreshIcon">↻</span>
+            <span id="refreshText">Update Now</span>
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <section class="popup-section skins-section">
       <div class="section-header">
-        <span class="section-icon">🔮</span>
-        <span class="section-title">Pattern Database</span>
+        <span class="section-icon">🏷️</span>
+        <span class="section-title">cs2pattern Supported Skins</span>
       </div>
       <div class="section-body">
-        <div class="status-row">
-          <span class="status-label">Last updated</span>
-          <span class="status-value" id="lastUpdated">Never</span>
+        <div class="search-container">
+          <input type="text" id="skinSearch" class="search-input" placeholder="Search skins (e.g. Case Hardened)...">
+          <span class="search-icon">🔍</span>
         </div>
-        <button id="refreshBtn" class="refresh-btn">
-          <span class="refresh-icon" id="refreshIcon">↻</span>
-          <span id="refreshText">Update Now</span>
-        </button>
+        <div id="skinList" class="skin-list">
+          <!-- Populated via JS -->
+        </div>
       </div>
     </section>
 
